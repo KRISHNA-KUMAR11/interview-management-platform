@@ -1,0 +1,52 @@
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+  PENDING
+}
+
+enum InterviewType {
+  LIVE
+  TECHNICAL
+  COMBINED
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  WAITING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ParticipantRole {
+  INTERVIEWER
+  CANDIDATE
+  OBSERVER
+}
+
+enum HireRecommendation {
+  HIRE
+  NO_HIRE
+  MAYBE
+}
+
+enum QuestionType {
+  MCQ
+  SHORT_ANSWER
+  CODING
+}
+
+enum QuestionDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum TechnicalAttemptStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  REVIEWED
+  EXPIRED
+}

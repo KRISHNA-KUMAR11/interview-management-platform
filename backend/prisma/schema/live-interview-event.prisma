@@ -1,0 +1,13 @@
+model LiveInterviewEvent {
+  id                String   @id @default(uuid()) @map("_id")
+  live_interview_id String
+  actor_user_id     String?
+  event_type        String
+  message           String?
+  created_at        DateTime @default(now())
+
+  liveInterview LiveInterview @relation(fields: [live_interview_id], references: [id], onDelete: Cascade)
+  actor         User?         @relation(fields: [actor_user_id], references: [id], onDelete: SetNull)
+
+  @@index([live_interview_id])
+}

@@ -1,0 +1,18 @@
+model Candidate {
+  id         String   @id @default(uuid()) @map("_id")
+  company_id String
+  user_id    String?  @unique
+  first_name String
+  last_name  String
+  email      String
+  phone      String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  company    Company     @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  user       User?       @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  interviews Interview[]
+
+  @@unique([company_id, email])
+  @@index([company_id])
+}

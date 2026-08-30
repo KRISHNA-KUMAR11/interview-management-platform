@@ -1,0 +1,19 @@
+model LiveInterviewParticipant {
+  id                 String          @id @default(uuid()) @map("_id")
+  live_interview_id  String
+  user_id            String
+  role               ParticipantRole
+  camera_ok          Boolean         @default(false)
+  microphone_ok      Boolean         @default(false)
+  media_check_passed Boolean         @default(false)
+  joined_at          DateTime?
+  left_at            DateTime?
+  created_at         DateTime        @default(now())
+  updated_at         DateTime        @updatedAt
+
+  liveInterview LiveInterview @relation(fields: [live_interview_id], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([live_interview_id, user_id])
+  @@index([user_id])
+}

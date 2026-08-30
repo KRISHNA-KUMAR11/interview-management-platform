@@ -1,0 +1,21 @@
+model TechnicalAnswer {
+  id                     String    @id @default(uuid()) @map("_id")
+  technical_interview_id String
+  question_id            String
+  answer_text            String?
+  selected_option_id     String?
+  code                   String?
+  score                  Int?
+  feedback               String?
+  graded_by_id           String?
+  graded_at              DateTime?
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @updatedAt
+
+  technicalInterview TechnicalInterview @relation(fields: [technical_interview_id], references: [id], onDelete: Cascade)
+  question           Question           @relation(fields: [question_id], references: [id], onDelete: Restrict)
+  gradedBy           User?              @relation(fields: [graded_by_id], references: [id], onDelete: SetNull)
+
+  @@unique([technical_interview_id, question_id])
+  @@index([technical_interview_id])
+}

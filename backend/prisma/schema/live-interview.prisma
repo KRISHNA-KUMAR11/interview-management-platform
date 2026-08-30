@@ -1,0 +1,17 @@
+model LiveInterview {
+  id                String    @id @default(uuid()) @map("_id")
+  interview_id      String    @unique
+  room_code         String    @unique
+  invite_token      String    @unique
+  recording_enabled Boolean   @default(false)
+  is_recording      Boolean   @default(false)
+  started_at        DateTime?
+  ended_at          DateTime?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  interview    Interview                   @relation(fields: [interview_id], references: [id], onDelete: Cascade)
+  participants LiveInterviewParticipant[]
+  recordings   LiveInterviewRecording[]
+  events       LiveInterviewEvent[]
+}

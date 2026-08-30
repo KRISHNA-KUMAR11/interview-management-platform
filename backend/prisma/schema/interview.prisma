@@ -1,0 +1,29 @@
+model Interview {
+  id               String          @id @default(uuid()) @map("_id")
+  company_id       String
+  title            String
+  type             InterviewType
+  status           InterviewStatus @default(SCHEDULED)
+  scheduled_at     DateTime
+  ends_at          DateTime
+  duration_minutes Int             @default(60)
+  candidate_id     String
+  interviewer_id   String
+  created_by_id    String
+  notes            String?
+  created_at       DateTime        @default(now())
+  updated_at       DateTime        @updatedAt
+
+  company          Company             @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  candidate        Candidate           @relation(fields: [candidate_id], references: [id])
+  interviewer      User                @relation("InterviewInterviewer", fields: [interviewer_id], references: [id])
+  createdBy        User                @relation("InterviewCreator", fields: [created_by_id], references: [id])
+  liveSession      LiveInterview?
+  technicalSession TechnicalInterview?
+  feedback         InterviewFeedback[]
+
+  @@index([company_id])
+  @@index([candidate_id])
+  @@index([interviewer_id])
+  @@index([status])
+}

@@ -1,0 +1,16 @@
+{
+  "name": "interview-management-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Interview Management Platform — Auth + RBAC foundation",
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "backend:dev": "npm --prefix backend start",
+    "frontend:dev": "npm --prefix frontend start",
+    "backend:seed": "npm --prefix backend run prisma:seed"
+  },
+  "dependencies": {
+    "git": "^0.1.5"
+  }
+}

@@ -1,0 +1,23 @@
+model Question {
+  id            String             @id @default(uuid()) @map("_id")
+  company_id    String
+  title         String
+  body          String
+  type          QuestionType
+  difficulty    QuestionDifficulty @default(MEDIUM)
+  language      String?
+  points        Int                @default(10)
+  options_json  String?
+  starter_code  String?
+  created_by_id String
+  created_at    DateTime           @default(now())
+  updated_at    DateTime           @updatedAt
+
+  company   Company                      @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  createdBy User                         @relation(fields: [created_by_id], references: [id])
+  usages    TechnicalInterviewQuestion[]
+  answers   TechnicalAnswer[]
+
+  @@index([company_id])
+  @@index([type])
+}

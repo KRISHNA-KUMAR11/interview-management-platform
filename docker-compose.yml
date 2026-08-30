@@ -1,0 +1,26 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: imp-mongo
+    restart: unless-stopped
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - imp_mongo_data:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "--quiet",
+          "--eval",
+          "try { rs.status().ok } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: '127.0.0.1:27017' }] }) }",
+        ]
+      interval: 5s
+      timeout: 10s
+      start_period: 15s
+      retries: 12
+
+volumes:
+  imp_mongo_data:

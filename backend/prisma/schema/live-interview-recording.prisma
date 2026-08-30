@@ -1,0 +1,17 @@
+model LiveInterviewRecording {
+  id               String   @id @default(uuid()) @map("_id")
+  live_interview_id String
+  recorded_by_id    String
+  label             String
+  file_name         String
+  file_path         String
+  mime_type         String
+  size_bytes        Int
+  duration_seconds  Int?
+  created_at        DateTime @default(now())
+
+  liveInterview LiveInterview @relation(fields: [live_interview_id], references: [id], onDelete: Cascade)
+  recordedBy    User          @relation(fields: [recorded_by_id], references: [id])
+
+  @@index([live_interview_id])
+}

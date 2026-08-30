@@ -1,0 +1,19 @@
+model TechnicalInterview {
+  id                 String                 @id @default(uuid()) @map("_id")
+  interview_id       String                 @unique
+  invite_token       String                 @unique
+  time_limit_minutes Int                    @default(60)
+  instructions       String?
+  attempt_status     TechnicalAttemptStatus @default(NOT_STARTED)
+  started_at         DateTime?
+  submitted_at       DateTime?
+  total_score        Int?
+  max_score          Int                    @default(0)
+  created_at         DateTime               @default(now())
+  updated_at         DateTime               @updatedAt
+
+  interview  Interview                     @relation(fields: [interview_id], references: [id], onDelete: Cascade)
+  questions  TechnicalInterviewQuestion[]
+  answers    TechnicalAnswer[]
+  recordings TechnicalInterviewRecording[]
+}

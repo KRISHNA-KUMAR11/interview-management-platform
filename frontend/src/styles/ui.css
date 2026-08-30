@@ -1,0 +1,274 @@
+/* Styles for the shared UI kit in src/components/ui. Page-specific styles
+   stay in index.css; anything here must be reusable across every feature. */
+
+/* ---------- Toasts ---------- */
+
+.toast-viewport {
+  position: fixed;
+  top: var(--space-5);
+  right: var(--space-5);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(380px, calc(100vw - var(--space-8)));
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-lg);
+  animation: toast-in var(--ease-slow) both;
+}
+
+.toast.leaving {
+  animation: toast-out var(--ease) both;
+}
+
+.toast-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  margin-top: 6px;
+  flex: none;
+  background: var(--muted);
+}
+
+.toast.success {
+  border-color: color-mix(in srgb, var(--success) 35%, var(--line));
+}
+
+.toast.success .toast-dot {
+  background: var(--success);
+}
+
+.toast.error {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--line));
+}
+
+.toast.error .toast-dot {
+  background: var(--danger);
+}
+
+.toast.info .toast-dot {
+  background: var(--info);
+}
+
+.toast-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-title {
+  font-weight: 700;
+  font-size: var(--text-base);
+}
+
+.toast-message {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.toast-close {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: var(--text-md);
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+}
+
+.toast-close:hover {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateX(16px) scale(0.98);
+  }
+}
+
+/* ---------- Skeletons ---------- */
+
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--surface-3) 25%,
+    var(--line) 37%,
+    var(--surface-3) 63%
+  );
+  background-size: 400% 100%;
+  animation: skeleton-sweep 1.4s ease infinite;
+}
+
+.skeleton-line {
+  height: 12px;
+  margin-bottom: var(--space-3);
+}
+
+.skeleton-line:last-child {
+  margin-bottom: 0;
+}
+
+.skeleton-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  padding: var(--space-5);
+  display: grid;
+  gap: var(--space-3);
+}
+
+@keyframes skeleton-sweep {
+  from {
+    background-position: 100% 50%;
+  }
+  to {
+    background-position: 0 50%;
+  }
+}
+
+/* ---------- Spinner ---------- */
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-top-color: currentColor;
+  animation: spin 700ms linear infinite;
+  display: inline-block;
+  vertical-align: -3px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Theme toggle ---------- */
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  transition: background var(--ease), border-color var(--ease);
+}
+
+.theme-toggle:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-3);
+}
+
+/* ---------- Pagination ---------- */
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.pagination-info {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.pagination-page {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  transition: background var(--ease), border-color var(--ease);
+}
+
+.pagination-page:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--surface-3);
+}
+
+.pagination-page.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.pagination-page:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---------- Misc ---------- */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.stack {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}

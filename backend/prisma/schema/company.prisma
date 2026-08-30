@@ -1,0 +1,13 @@
+model Company {
+  id         String   @id @default(uuid()) @map("_id")
+  name       String
+  slug       String   @unique
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  users      User[]
+  candidates Candidate[]
+  interviews Interview[]
+  questions  Question[]
+}

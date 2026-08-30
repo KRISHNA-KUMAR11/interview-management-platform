@@ -1,0 +1,114 @@
+/* Design tokens. Every colour, space and type value used by the app resolves
+   here, so themes can be swapped by overriding a single block. */
+
+:root {
+  /* Neutrals and surfaces */
+  --bg: #0f1c18;
+  --bg-2: #163028;
+  --surface: #f4f7f5;
+  --surface-2: #ffffff;
+  --surface-3: #fbfcfb;
+  --ink: #13201b;
+  --muted: #5d6f67;
+  --line: #d7e2dc;
+  --line-strong: #bccec5;
+
+  /* Brand + semantic */
+  --accent: #0f6b4c;
+  --accent-hover: #0c5940;
+  --accent-contrast: #ffffff;
+  --accent-2: #c8f0de;
+  --accent-soft: #eef6f1;
+  --danger: #9b2c2c;
+  --danger-soft: #fde8e8;
+  --warning: #8a6d00;
+  --warning-soft: #fff4d6;
+  --info: #2f4d9b;
+  --info-soft: #e8eefc;
+  --success: #0f6b4c;
+  --success-soft: #e3f5ec;
+
+  /* Elevation */
+  --shadow: 0 24px 60px rgba(10, 28, 22, 0.18);
+  --shadow-sm: 0 2px 6px rgba(19, 32, 27, 0.05);
+  --shadow-md: 0 10px 30px rgba(19, 32, 27, 0.06);
+  --shadow-lg: 0 18px 44px rgba(19, 32, 27, 0.1);
+  --ring: 0 0 0 3px rgba(15, 107, 76, 0.18);
+
+  /* Radii */
+  --radius-sm: 12px;
+  --radius: 16px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Type scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.85rem;
+  --text-base: 0.95rem;
+  --text-md: 1.05rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.6rem;
+  --text-2xl: 2rem;
+
+  /* Motion */
+  --ease: 160ms cubic-bezier(0.2, 0.7, 0.3, 1);
+  --ease-slow: 260ms cubic-bezier(0.2, 0.7, 0.3, 1);
+
+  /* Layering */
+  --z-modal: 100;
+  --z-toast: 200;
+
+  /* Page backdrop, themed so the dark variant can replace it wholesale */
+  --page-backdrop:
+    radial-gradient(circle at top left, rgba(200, 240, 222, 0.55), transparent 32%),
+    linear-gradient(180deg, #eef4f0 0%, #f7faf8 100%);
+}
+
+[data-theme='dark'] {
+  --bg: #060f0c;
+  --bg-2: #0d1a15;
+  --surface: #0b1512;
+  --surface-2: #121f1a;
+  --surface-3: #16261f;
+  --ink: #e6efea;
+  --muted: #93a89f;
+  --line: #22352d;
+  --line-strong: #33483f;
+
+  --accent: #3fbd8c;
+  --accent-hover: #56d3a1;
+  --accent-contrast: #04140e;
+  --accent-2: #143d2c;
+  --accent-soft: #10261d;
+  --danger: #f08a8a;
+  --danger-soft: #3a1b1b;
+  --warning: #e6c264;
+  --warning-soft: #352b10;
+  --info: #8fb0f5;
+  --info-soft: #17233f;
+  --success: #3fbd8c;
+  --success-soft: #10301f;
+
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 18px 44px rgba(0, 0, 0, 0.5);
+  --ring: 0 0 0 3px rgba(63, 189, 140, 0.28);
+
+  --page-backdrop:
+    radial-gradient(circle at top left, rgba(24, 74, 55, 0.5), transparent 34%),
+    linear-gradient(180deg, #08120f 0%, #0b1512 100%);
+
+  color-scheme: dark;
+}

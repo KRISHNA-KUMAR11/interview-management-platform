@@ -1,0 +1,13 @@
+model TechnicalInterviewQuestion {
+  id                     String @id @default(uuid()) @map("_id")
+  technical_interview_id String
+  question_id            String
+  sort_order             Int    @default(0)
+  points                 Int
+
+  technicalInterview TechnicalInterview @relation(fields: [technical_interview_id], references: [id], onDelete: Cascade)
+  question           Question           @relation(fields: [question_id], references: [id], onDelete: Restrict)
+
+  @@unique([technical_interview_id, question_id])
+  @@index([technical_interview_id])
+}

@@ -1,0 +1,17 @@
+model InterviewFeedback {
+  id              String             @id @default(uuid()) @map("_id")
+  interview_id    String
+  submitted_by_id String
+  rating          Int
+  recommendation  HireRecommendation
+  strengths       String?
+  weaknesses      String?
+  comments        String?
+  submitted_at    DateTime           @default(now())
+
+  interview   Interview @relation(fields: [interview_id], references: [id], onDelete: Cascade)
+  submittedBy User      @relation(fields: [submitted_by_id], references: [id])
+
+  @@unique([interview_id, submitted_by_id])
+  @@index([interview_id])
+}

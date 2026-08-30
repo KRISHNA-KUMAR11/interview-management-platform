@@ -1,0 +1,31 @@
+model User {
+  id            String     @id @default(uuid()) @map("_id")
+  company_id    String?
+  role_id       String
+  first_name    String
+  last_name     String
+  email         String     @unique
+  password_hash String
+  status        UserStatus @default(ACTIVE)
+  last_login_at DateTime?
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
+
+  company                Company?                      @relation(fields: [company_id], references: [id], onDelete: SetNull)
+  role                   Role                          @relation(fields: [role_id], references: [id])
+  refreshTokens          RefreshToken[]
+  passwordResetTokens    PasswordResetToken[]
+  candidateProfile       Candidate?
+  interviewsCreated      Interview[]                   @relation("InterviewCreator")
+  interviewsAssigned     Interview[]                   @relation("InterviewInterviewer")
+  liveParticipations     LiveInterviewParticipant[]
+  feedbackSubmitted      InterviewFeedback[]
+  recordingsUploaded     LiveInterviewRecording[]
+  techRecordingsUploaded TechnicalInterviewRecording[]
+  liveEvents             LiveInterviewEvent[]
+  questionsCreated       Question[]
+  answersGraded          TechnicalAnswer[]
+
+  @@index([company_id])
+  @@index([role_id])
+}

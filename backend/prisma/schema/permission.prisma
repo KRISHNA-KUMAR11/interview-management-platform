@@ -1,0 +1,10 @@
+model Permission {
+  id          String   @id @default(uuid()) @map("_id")
+  code        String   @unique
+  module      String
+  action      String
+  description String?
+  created_at  DateTime @default(now())
+
+  rolePermissions RolePermission[]
+}
