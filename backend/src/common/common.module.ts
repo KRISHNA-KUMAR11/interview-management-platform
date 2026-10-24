@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { GuestAccessService } from './guest-access.service';
+import { IceServerService } from './ice-server.service';
+import { MailService } from './mail.service';
+import { ObjectStorageService } from './object-storage.service';
 
 @Module({
   imports: [
@@ -13,7 +16,17 @@ import { GuestAccessService } from './guest-access.service';
       }),
     }),
   ],
-  providers: [GuestAccessService],
-  exports: [GuestAccessService],
+  providers: [
+    GuestAccessService,
+    IceServerService,
+    MailService,
+    ObjectStorageService,
+  ],
+  exports: [
+    GuestAccessService,
+    IceServerService,
+    MailService,
+    ObjectStorageService,
+  ],
 })
 export class CommonModule {}

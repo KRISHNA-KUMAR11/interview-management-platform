@@ -227,9 +227,13 @@ export function TechnicalReviewPage() {
             />
           ))
         )}
-        {session.integrityEvents && session.integrityEvents.length > 0 ? (
-          <div className="review-answer-block">
-            <strong>Anti-cheat notes</strong>
+        <div className="review-answer-block">
+          <strong>Anti-cheat notes</strong>
+          <p className="meta">
+            These notes are a signal for the interviewer. A warning is not
+            proof that the candidate cheated.
+          </p>
+          {session.integrityEvents && session.integrityEvents.length > 0 ? (
             <ul className="detail-list">
               {session.integrityEvents.map((event) => (
                 <li key={event.id}>
@@ -241,8 +245,10 @@ export function TechnicalReviewPage() {
                 </li>
               ))}
             </ul>
-          </div>
-        ) : null}
+          ) : (
+            <p className="meta">No warnings were recorded.</p>
+          )}
+        </div>
       </section>
 
       <div className="tech-question-list">

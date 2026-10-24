@@ -1,0 +1,11 @@
+model TechnicalInterviewEvent {
+  id                     String   @id @default(uuid()) @map("_id")
+  technical_interview_id String
+  event_type             String
+  message                String?
+  created_at             DateTime @default(now())
+
+  technicalInterview TechnicalInterview @relation(fields: [technical_interview_id], references: [id], onDelete: Cascade)
+
+  @@index([technical_interview_id])
+}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import { SOCKET_BASE } from '../lib/api';
+import { liveInterviewApi, SOCKET_BASE } from '../lib/api';
 import { guestSession } from '../lib/guestSession';
 import { tokenStorage } from '../lib/tokenStorage';
 
@@ -11,7 +11,7 @@ interface PeerInfo {
   lastName?: string;
 }
 
-const ICE_SERVERS: RTCIceServer[] = [
+const FALLBACK_ICE: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
 ];
@@ -29,6 +29,7 @@ export function useLiveRoom(options: {
   const onSessionEventRef = useRef(onSessionEvent);
   onSessionEventRef.current = onSessionEvent;
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const iceServersRef = useRef<RTCIceServer[]>(FALLBACK_ICE);
   const [remoteStreams, setRemoteStreams] = useState<
     Array<{ socketId: string; stream: MediaStream; label: string }>
   >([]);
@@ -47,7 +48,7 @@ export function useLiveRoom(options: {
     async (peer: PeerInfo, isInitiator: boolean) => {
       if (!localStream || peersRef.current.has(peer.socketId)) return;
 
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      const pc = new RTCPeerConnection({ iceServers: iceServersRef.current });
       peersRef.current.set(peer.socketId, pc);
 
       localStream.getTracks().forEach((track) => {
@@ -118,101 +119,119 @@ export function useLiveRoom(options: {
     const token = tokenStorage.getAccessToken() || guestSession.getToken();
     if (!token) return;
 
-    const socket = io(`${SOCKET_BASE}/live`, {
-      auth: { token },
-      transports: ['websocket', 'polling'],
-    });
-    socketRef.current = socket;
+    let socket: Socket | null = null;
+    let stopped = false;
 
-    socket.on('connect', () => {
-      setConnectionLabel('In room');
-      void socket
-        .emitWithAck('room:join', { roomCode, liveInterviewId })
-        .then((response: { ok?: boolean; peers?: PeerInfo[] }) => {
-          if (!response?.peers) return;
-          response.peers.forEach((peer) => {
-            void createPeer(peer, true);
+    void liveInterviewApi
+      .iceServers()
+      .then((response) => {
+        if (response.data && response.data.length > 0) {
+          iceServersRef.current = response.data;
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (stopped) return;
+        socket = io(`${SOCKET_BASE}/live`, {
+          auth: { token },
+          transports: ['websocket', 'polling'],
+        });
+        socketRef.current = socket;
+        bindSocket(socket);
+      });
+
+    const bindSocket = (active: Socket) => {
+      active.on('connect', () => {
+        setConnectionLabel('In room');
+        void active
+          .emitWithAck('room:join', { roomCode, liveInterviewId })
+          .then((response: { ok?: boolean; peers?: PeerInfo[] }) => {
+            if (!response?.peers) return;
+            response.peers.forEach((peer) => {
+              void createPeer(peer, true);
+            });
           });
-        });
-    });
+      });
 
-    socket.on('peer:joined', (peer: PeerInfo) => {
-      void createPeer(peer, false);
-    });
+      active.on('peer:joined', (peer: PeerInfo) => {
+        void createPeer(peer, false);
+      });
 
-    socket.on(
-      'signal:offer',
-      async (payload: {
-        from: string;
-        sdp: RTCSessionDescriptionInit;
-        user?: PeerInfo;
-      }) => {
-        let pc = peersRef.current.get(payload.from);
-        if (!pc) {
-          await createPeer(
-            {
-              socketId: payload.from,
-              userId: payload.user?.userId,
-              firstName: payload.user?.firstName,
-              lastName: payload.user?.lastName,
-            },
-            false,
-          );
-          pc = peersRef.current.get(payload.from);
-        }
-        if (!pc) return;
-        await pc.setRemoteDescription(payload.sdp);
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        socket.emit('signal:answer', {
-          to: payload.from,
-          roomCode,
-          sdp: answer,
-        });
-      },
-    );
+      active.on(
+        'signal:offer',
+        async (payload: {
+          from: string;
+          sdp: RTCSessionDescriptionInit;
+          user?: PeerInfo;
+        }) => {
+          let pc = peersRef.current.get(payload.from);
+          if (!pc) {
+            await createPeer(
+              {
+                socketId: payload.from,
+                userId: payload.user?.userId,
+                firstName: payload.user?.firstName,
+                lastName: payload.user?.lastName,
+              },
+              false,
+            );
+            pc = peersRef.current.get(payload.from);
+          }
+          if (!pc) return;
+          await pc.setRemoteDescription(payload.sdp);
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          active.emit('signal:answer', {
+            to: payload.from,
+            roomCode,
+            sdp: answer,
+          });
+        },
+      );
 
-    socket.on(
-      'signal:answer',
-      async (payload: { from: string; sdp: RTCSessionDescriptionInit }) => {
-        const pc = peersRef.current.get(payload.from);
-        if (!pc) return;
-        await pc.setRemoteDescription(payload.sdp);
-      },
-    );
+      active.on(
+        'signal:answer',
+        async (payload: { from: string; sdp: RTCSessionDescriptionInit }) => {
+          const pc = peersRef.current.get(payload.from);
+          if (!pc) return;
+          await pc.setRemoteDescription(payload.sdp);
+        },
+      );
 
-    socket.on(
-      'signal:ice',
-      async (payload: { from: string; candidate: RTCIceCandidateInit }) => {
-        const pc = peersRef.current.get(payload.from);
-        if (!pc || !payload.candidate) return;
-        try {
-          await pc.addIceCandidate(payload.candidate);
-        } catch {
-          // ignore late candidates
-        }
-      },
-    );
+      active.on(
+        'signal:ice',
+        async (payload: { from: string; candidate: RTCIceCandidateInit }) => {
+          const pc = peersRef.current.get(payload.from);
+          if (!pc || !payload.candidate) return;
+          try {
+            await pc.addIceCandidate(payload.candidate);
+          } catch {
+            // ignore late candidates
+          }
+        },
+      );
 
-    socket.on('peer:left', (payload: { socketId: string }) => {
-      cleanupPeer(payload.socketId);
-    });
+      active.on('peer:left', (payload: { socketId: string }) => {
+        cleanupPeer(payload.socketId);
+      });
 
-    socket.on(
-      'session:event',
-      (payload: { type?: string; payload?: Record<string, unknown> }) => {
-        if (payload?.type) {
-          onSessionEventRef.current?.(payload.type, payload.payload);
-        }
-      },
-    );
+      active.on(
+        'session:event',
+        (payload: { type?: string; payload?: Record<string, unknown> }) => {
+          if (payload?.type) {
+            onSessionEventRef.current?.(payload.type, payload.payload);
+          }
+        },
+      );
+    };
 
     return () => {
-      socket.emit('room:leave', { roomCode });
+      stopped = true;
+      socket?.emit('room:leave', { roomCode });
       peersRef.current.forEach((pc) => pc.close());
       peersRef.current.clear();
       setRemoteStreams([]);
-      socket.disconnect();
+      socket?.disconnect();
       socketRef.current = null;
     };
   }, [

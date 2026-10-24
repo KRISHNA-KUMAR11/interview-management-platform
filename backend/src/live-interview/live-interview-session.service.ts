@@ -13,6 +13,8 @@ import {
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { interviewerRoleWhere } from '../common/interview-scope';
 import { generateInviteToken, generateRoomCode } from '../common/invite-token';
+import { MailService } from '../common/mail.service';
+import { assertInterviewerFree } from '../common/interviewer-schedule';
 import { resolveInterviewWindow } from '../common/interview-window';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -29,6 +31,7 @@ export class LiveInterviewSessionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly context: LiveInterviewContextService,
+    private readonly mail: MailService,
   ) {}
 
   async list(user: AuthUser) {
@@ -122,6 +125,12 @@ export class LiveInterviewSessionService {
     const inviteToken = generateInviteToken();
     const window = this.resolveWindow(dto);
 
+    await assertInterviewerFree(this.prisma, {
+      interviewerId: dto.interviewerId,
+      startsAt: window.startsAt,
+      endsAt: window.endsAt,
+    });
+
     const created = await this.prisma.$transaction(async (tx) => {
       const interview = await tx.interview.create({
         data: {
@@ -168,6 +177,16 @@ export class LiveInterviewSessionService {
       return live;
     });
 
+    await this.mail.sendInterviewEmail({
+      to: created.interview.candidate.email,
+      candidateName: `${created.interview.candidate.first_name} ${created.interview.candidate.last_name}`,
+      title: created.interview.title,
+      startsAt: created.interview.scheduled_at,
+      endsAt: created.interview.ends_at,
+      kind: 'scheduled',
+      liveToken: created.invite_token,
+    });
+
     return this.context.mapSession(created);
   }
 
@@ -208,6 +227,15 @@ export class LiveInterviewSessionService {
           'Interviewer must belong to the same company.',
         );
       }
+    }
+
+    if (window || dto.interviewerId) {
+      await assertInterviewerFree(this.prisma, {
+        interviewerId: dto.interviewerId ?? session.interview.interviewer_id,
+        startsAt: window?.startsAt ?? session.interview.scheduled_at,
+        endsAt: window?.endsAt ?? session.interview.ends_at,
+        exceptInterviewId: session.interview_id,
+      });
     }
 
     const candidateUpdates: Prisma.CandidateUpdateInput = {};
@@ -310,6 +338,18 @@ export class LiveInterviewSessionService {
         include: liveInterviewDetailInclude,
       });
     });
+
+    if (window || dto.title) {
+      await this.mail.sendInterviewEmail({
+        to: updated.interview.candidate.email,
+        candidateName: `${updated.interview.candidate.first_name} ${updated.interview.candidate.last_name}`,
+        title: updated.interview.title,
+        startsAt: updated.interview.scheduled_at,
+        endsAt: updated.interview.ends_at,
+        kind: 'updated',
+        liveToken: updated.invite_token,
+      });
+    }
 
     return this.context.mapSession(updated);
   }

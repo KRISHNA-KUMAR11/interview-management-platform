@@ -15,7 +15,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import { createReadStream, existsSync, mkdirSync } from 'fs';
+import { mkdirSync } from 'fs';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
 import type { Response } from 'express';
@@ -36,6 +36,7 @@ import { LiveInterviewFeedbackService } from './live-interview-feedback.service'
 import { LiveInterviewRecordingService } from './live-interview-recording.service';
 import { LiveInterviewRoomService } from './live-interview-room.service';
 import { LiveInterviewSessionService } from './live-interview-session.service';
+import { IceServerService } from '../common/ice-server.service';
 
 @Controller('live-interviews')
 export class LiveInterviewController {
@@ -45,6 +46,7 @@ export class LiveInterviewController {
     private readonly roomService: LiveInterviewRoomService,
     private readonly recordingService: LiveInterviewRecordingService,
     private readonly feedbackService: LiveInterviewFeedbackService,
+    private readonly iceServers: IceServerService,
   ) {}
 
   @Get()
@@ -52,6 +54,12 @@ export class LiveInterviewController {
   async list(@CurrentUser() user: AuthUser) {
     const data = await this.sessionService.list(user);
     return ApiResponseDto.ok('Live interviews loaded.', data);
+  }
+
+  @Get('ice-servers')
+  @RequirePermissions('LiveInterview.Join')
+  ice() {
+    return ApiResponseDto.ok('Call network settings loaded.', this.iceServers.list());
   }
 
   @Get('interviewers')
@@ -99,21 +107,14 @@ export class LiveInterviewController {
       recordingId,
       user,
     );
-
-    if (!existsSync(recording.file_path)) {
+    const streamed = await this.recordingService.pipeRecording(recording, res);
+    if (!streamed) {
       return res.status(404).json({
         success: false,
         message: 'Recording file is missing.',
         data: null,
       });
     }
-
-    res.setHeader('Content-Type', recording.mime_type);
-    res.setHeader(
-      'Content-Disposition',
-      `inline; filename="${recording.file_name}"`,
-    );
-    createReadStream(recording.file_path).pipe(res);
   }
 
   @Get(':id')

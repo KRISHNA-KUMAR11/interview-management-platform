@@ -4,7 +4,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import { ObjectStorageService } from '../common/object-storage.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   liveInterviewDetailInclude,
@@ -17,6 +19,7 @@ export class LiveInterviewRecordingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly context: LiveInterviewContextService,
+    private readonly storage: ObjectStorageService,
   ) {}
 
   async toggleRecording(id: string, user: AuthUser, dto: ToggleRecordingDto) {
@@ -59,13 +62,18 @@ export class LiveInterviewRecordingService {
       throw new BadRequestException('Recording file is required.');
     }
 
+    const storedPath = await this.storage.saveUpload(
+      file,
+      `live/${id}/${file.filename}`,
+    );
+
     const recording = await this.prisma.liveInterviewRecording.create({
       data: {
         live_interview_id: id,
         recorded_by_id: user.userId,
         label: meta.label?.trim() || `${user.email} recording`,
         file_name: file.filename,
-        file_path: file.path,
+        file_path: storedPath,
         mime_type: file.mimetype || 'video/webm',
         size_bytes: file.size,
         duration_seconds: meta.durationSeconds ?? null,
@@ -112,6 +120,21 @@ export class LiveInterviewRecordingService {
       throw new NotFoundException('Recording not found.');
     }
     return recording;
+  }
+
+  async pipeRecording(
+    recording: { file_path: string; mime_type: string; file_name: string },
+    res: Response,
+  ) {
+    const stream = await this.storage.open(recording.file_path);
+    if (!stream) return false;
+    res.setHeader('Content-Type', recording.mime_type);
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${recording.file_name}"`,
+    );
+    stream.pipe(res);
+    return true;
   }
 
   async getReview(id: string, user: AuthUser) {

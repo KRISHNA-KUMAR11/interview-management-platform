@@ -196,6 +196,9 @@ export const liveInterviewApi = {
   list() {
     return request<LiveInterviewSession[]>('/live-interviews');
   },
+  iceServers() {
+    return request<RTCIceServer[]>('/live-interviews/ice-servers');
+  },
   get(id: string) {
     return request<LiveInterviewSession>(`/live-interviews/${id}`);
   },

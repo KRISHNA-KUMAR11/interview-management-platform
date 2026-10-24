@@ -6,7 +6,7 @@ Enterprise interview platform foundation with **Authentication + RBAC** as Modul
 
 - **Backend:** NestJS, Prisma, MongoDB, JWT (access + refresh)
 - **Frontend:** React, Vite, React Router
-- **Infra:** Docker Compose (MongoDB replica set)
+- **Infra:** Docker Compose (MongoDB replica set, coturn, S3, Mailpit)
 
 Architecture, module boundaries and conventions: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -26,7 +26,13 @@ fields (`created_at`, `recorded_by_id`).
 docker compose up -d
 ```
 
-Wait until `imp-mongo` is healthy. Connection string (already in `backend/.env.example`):
+Wait until `imp-mongo` is healthy. The same compose file also starts:
+
+- **coturn** on port `3478` so live calls can relay when a direct connection fails
+- **S3** on `http://127.0.0.1:9090` for recordings
+- **Mailpit** on `http://127.0.0.1:8025` so scheduled, updated, and cancelled interview emails can be read locally
+
+Connection string (already in `backend/.env.example`):
 
 `mongodb://127.0.0.1:27017/interview_platform?replicaSet=rs0`
 
@@ -85,6 +91,7 @@ the dump to the new machine.
 | `EPERM` during `prisma generate` | Stop the running backend first, then regenerate |
 | CORS errors in the browser | `FRONTEND_URL` in `backend/.env` must match the Vite origin exactly |
 | Camera/mic blocked when opening the app from another device over LAN | `getUserMedia` requires a secure context — use `localhost`, HTTPS, or a tunnel such as `ngrok` |
+| Live call connects on one machine and fails for a remote candidate | Set `TURN_PUBLIC_IP` to this machine's reachable address, then `docker compose up -d` so coturn advertises it. Match `TURN_URLS` in `backend/.env` |
 
 ## Demo accounts
 
@@ -124,15 +131,19 @@ the dump to the new machine.
 | POST | `/api/v1/live-interviews/:id/complete` | `LiveInterview.Join` |
 | POST | `/api/v1/live-interviews/:id/leave` | `LiveInterview.Join` |
 
-WebRTC signaling: Socket.IO namespace `/live` (JWT via `auth.token`).
+WebRTC signaling: Socket.IO namespace `/live` (JWT via `auth.token`). Media uses STUN plus the coturn TURN relay from `GET /api/v1/live-interviews/ice-servers`.
 
 ### Live interview UI flow
 
 1. Open **Live Interview** in the app
-2. HR creates a session (or use the seeded demo)
-3. Interviewer + candidate open the lobby → camera/mic check
-4. Enter room → WebRTC peer connection
-5. Start interview → optional recording → complete → feedback
+2. HR creates a session (or use the seeded demo). The candidate receives an email in Mailpit
+3. Interviewer and candidate open the lobby and check camera and microphone
+4. Enter the room. The call connects directly when it can, and through TURN when it cannot
+5. Start the interview. The host records the conversation. The candidate's own camera is saved separately
+6. Complete the interview. The candidate is removed from the room and the invite stops working
+7. Review shows both recordings. Cancel from Interview Management closes the live and technical links and emails the candidate
+
+An interviewer cannot be booked for two interviews that overlap. Technical review lists anti-cheat warnings as a signal, not as proof.
 
 ## Login response shape
 
@@ -165,6 +176,6 @@ WebRTC signaling: Socket.IO namespace `/live` (JWT via `auth.token`).
 
 Dashboard navigation is filtered by the authenticated user's permissions.
 
-## Next modules
+## Modules
 
-Interview Management → Live Interview → Technical Interview → Candidates → Question Bank → Reports → Users → Settings
+Interview Management, Live Interview, Technical Interview, Candidates, Question Bank, Reports, Users, and Settings are in the app. Recordings go to the local S3 service when `S3_ENDPOINT` is set, and older files still play from `backend/uploads`.

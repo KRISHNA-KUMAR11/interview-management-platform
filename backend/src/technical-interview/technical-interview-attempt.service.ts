@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { randomUUID } from 'crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import {
   InterviewStatus,
@@ -208,59 +207,70 @@ export class TechnicalInterviewAttemptService {
       return { recorded: false };
     }
 
-    const event = appendIntegrityEvent(id, eventType, message);
+    await this.importLegacyEvents(id);
+    const event = await this.prisma.technicalInterviewEvent.create({
+      data: {
+        technical_interview_id: id,
+        event_type: eventType,
+        message: message?.slice(0, 240) ?? null,
+      },
+    });
     return {
       recorded: true,
       id: event.id,
-      eventType: event.eventType,
-      createdAt: event.createdAt,
+      eventType: event.event_type,
+      createdAt: event.created_at,
     };
   }
-}
 
-export interface StoredIntegrityEvent {
-  id: string;
-  eventType: string;
-  message: string | null;
-  createdAt: string;
-}
-
-function integrityFile(id: string) {
-  return join(
-    process.cwd(),
-    'uploads',
-    'technical-interviews',
-    id,
-    'integrity-events.json',
-  );
-}
-
-export function listIntegrityEvents(id: string): StoredIntegrityEvent[] {
-  const path = integrityFile(id);
-  if (!existsSync(path)) return [];
-  try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as StoredIntegrityEvent[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+  async listIntegrityEvents(id: string) {
+    await this.importLegacyEvents(id);
+    const rows = await this.prisma.technicalInterviewEvent.findMany({
+      where: { technical_interview_id: id },
+      orderBy: { created_at: 'asc' },
+    });
+    return rows.map((event) => ({
+      id: event.id,
+      eventType: event.event_type,
+      message: event.message,
+      createdAt: event.created_at,
+    }));
   }
-}
 
-function appendIntegrityEvent(
-  id: string,
-  eventType: string,
-  message?: string,
-): StoredIntegrityEvent {
-  const path = integrityFile(id);
-  mkdirSync(join(path, '..'), { recursive: true });
-  const events = listIntegrityEvents(id);
-  const event: StoredIntegrityEvent = {
-    id: randomUUID(),
-    eventType,
-    message: message?.slice(0, 240) ?? null,
-    createdAt: new Date().toISOString(),
-  };
-  events.push(event);
-  writeFileSync(path, JSON.stringify(events));
-  return event;
+  private async importLegacyEvents(id: string) {
+    const existing = await this.prisma.technicalInterviewEvent.count({
+      where: { technical_interview_id: id },
+    });
+    if (existing > 0) return;
+
+    const path = join(
+      process.cwd(),
+      'uploads',
+      'technical-interviews',
+      id,
+      'integrity-events.json',
+    );
+    if (!existsSync(path)) return;
+
+    try {
+      const parsed = JSON.parse(readFileSync(path, 'utf8')) as Array<{
+        eventType?: string;
+        message?: string | null;
+        createdAt?: string;
+      }>;
+      if (!Array.isArray(parsed) || parsed.length === 0) return;
+      await this.prisma.technicalInterviewEvent.createMany({
+        data: parsed
+          .filter((event) => event.eventType)
+          .map((event) => ({
+            technical_interview_id: id,
+            event_type: event.eventType as string,
+            message: event.message ?? null,
+            created_at: event.createdAt ? new Date(event.createdAt) : new Date(),
+          })),
+      });
+    } catch {
+      return;
+    }
+  }
 }

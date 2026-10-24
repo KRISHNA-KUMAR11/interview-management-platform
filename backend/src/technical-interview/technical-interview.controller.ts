@@ -15,7 +15,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import { createReadStream, existsSync, mkdirSync } from 'fs';
+import { mkdirSync } from 'fs';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
 import type { Response } from 'express';
@@ -232,19 +232,13 @@ export class TechnicalInterviewController {
       recordingId,
       user,
     );
-    if (!existsSync(recording.file_path)) {
+    const streamed = await this.recordingService.pipeRecording(recording, res);
+    if (!streamed) {
       return res.status(404).json({
         success: false,
-        message: 'Recording file is missing on disk.',
+        message: 'Recording file is missing.',
       });
     }
-
-    res.setHeader('Content-Type', recording.mime_type);
-    res.setHeader(
-      'Content-Disposition',
-      `inline; filename="${recording.file_name}"`,
-    );
-    createReadStream(recording.file_path).pipe(res);
   }
 
   @Post(':id/grade')

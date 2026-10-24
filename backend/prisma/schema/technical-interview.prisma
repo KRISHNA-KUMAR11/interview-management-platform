@@ -16,4 +16,5 @@ model TechnicalInterview {
   questions  TechnicalInterviewQuestion[]
   answers    TechnicalAnswer[]
   recordings TechnicalInterviewRecording[]
+  events     TechnicalInterviewEvent[]
 }

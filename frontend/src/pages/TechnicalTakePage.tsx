@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { Modal } from '../components/ui/Modal';
 import { useExamIntegrity } from '../hooks/useExamIntegrity';
 import { useFaceRecorder } from '../hooks/useFaceRecorder';
 import { technicalInterviewApi } from '../lib/api';
@@ -85,6 +86,7 @@ export function TechnicalTakePage() {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitPrompt, setSubmitPrompt] = useState<number | null>(null);
   const [endedByInterviewer, setEndedByInterviewer] = useState(false);
   const [warning, setWarning] = useState('');
   const [warningCount, setWarningCount] = useState(0);
@@ -608,22 +610,51 @@ export function TechnicalTakePage() {
             type="button"
             className="primary-btn"
             disabled={submitting}
-            onClick={() => {
-              const unanswered = questions.length - answeredCount;
-              const confirmed = window.confirm(
-                unanswered > 0
-                  ? `You have ${unanswered} unanswered question${
-                      unanswered === 1 ? '' : 's'
-                    }. Submit anyway? You will not be able to edit answers after this.`
-                  : 'Submit your assessment? You will not be able to edit answers after this.',
-              );
-              if (confirmed) void submitAssessment('manual');
-            }}
+            onClick={() => setSubmitPrompt(questions.length - answeredCount)}
           >
             {submitting ? 'Submitting…' : 'Submit assessment'}
           </button>
         </div>
       </footer>
+      {submitPrompt !== null ? (
+        <Modal
+          title="Submit assessment"
+          onClose={() => {
+            if (!submitting) setSubmitPrompt(null);
+          }}
+          footer={
+            <>
+              <button
+                type="button"
+                className="ghost-btn"
+                disabled={submitting}
+                onClick={() => setSubmitPrompt(null)}
+              >
+                Keep working
+              </button>
+              <button
+                type="button"
+                className="primary-btn"
+                disabled={submitting}
+                onClick={() => {
+                  setSubmitPrompt(null);
+                  void submitAssessment('manual');
+                }}
+              >
+                {submitting ? 'Submitting…' : 'Submit now'}
+              </button>
+            </>
+          }
+        >
+          <p className="lede">
+            {submitPrompt > 0
+              ? `You have ${submitPrompt} unanswered question${
+                  submitPrompt === 1 ? '' : 's'
+                }. Submitting now locks your answers.`
+              : 'Submitting now locks your answers.'}
+          </p>
+        </Modal>
+      ) : null}
     </section>
   );
 }
