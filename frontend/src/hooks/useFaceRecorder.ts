@@ -1,8 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+function pickMimeType() {
+  const types = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+  ];
+  return types.find((type) => MediaRecorder.isTypeSupported(type));
+}
+
 /**
- * Continuous webcam (+ mic) recording for technical assessment proctoring.
- * Camera access is required; call enableCamera() before startRecording().
+ * Candidate-only camera recording for a technical assessment.
+ * Video is required. Microphone is included when the device allows it.
+ * Call enableCamera() before startRecording(). Failures stay inside the hook.
  */
 export function useFaceRecorder() {
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -24,14 +36,17 @@ export function useFaceRecorder() {
     setCameraError('');
     try {
       stopTracks();
-      const media = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'user',
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: true,
-      });
+      const video = {
+        facingMode: 'user' as const,
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      };
+      let media: MediaStream;
+      try {
+        media = await navigator.mediaDevices.getUserMedia({ video, audio: true });
+      } catch {
+        media = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+      }
       streamRef.current = media;
       setStream(media);
       return media;
@@ -53,16 +68,21 @@ export function useFaceRecorder() {
     const media = streamRef.current;
     if (!media || recorderRef.current) return;
 
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-      ? 'video/webm;codecs=vp9,opus'
-      : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
-        ? 'video/webm;codecs=vp8,opus'
-        : 'video/webm';
-
-    const recorder = new MediaRecorder(media, {
-      mimeType,
-      videoBitsPerSecond: 1_000_000,
-    });
+    const mimeType = pickMimeType();
+    let recorder: MediaRecorder;
+    try {
+      recorder = mimeType
+        ? new MediaRecorder(media, {
+            mimeType,
+            videoBitsPerSecond: 1_000_000,
+          })
+        : new MediaRecorder(media);
+    } catch {
+      setCameraError(
+        'This browser could not start the camera recording. You can still answer the questions.',
+      );
+      return;
+    }
     chunksRef.current = [];
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) chunksRef.current.push(event.data);

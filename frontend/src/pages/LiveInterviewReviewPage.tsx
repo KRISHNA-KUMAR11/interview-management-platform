@@ -132,9 +132,14 @@ export function LiveInterviewReviewPage() {
       <div className="review-grid">
         <div className="review-main">
           <h2>Audio & video</h2>
+          <p className="lede">
+            The conversation file shows everyone in the call side by side. The
+            candidate file is their own camera.
+          </p>
           {review.recordings.length === 0 ? (
             <p className="lede">
-              No recordings were saved for this session. Start and complete an
+              No conversation recording was saved. The interviewer records the
+              oral call when recording is enabled. Start and complete an
               interview with camera/mic enabled to capture A/V.
             </p>
           ) : (

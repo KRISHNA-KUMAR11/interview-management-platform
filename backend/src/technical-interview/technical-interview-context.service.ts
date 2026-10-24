@@ -54,9 +54,10 @@ export type TechnicalInterviewDetail = Prisma.TechnicalInterviewGetPayload<{
   include: typeof technicalInterviewDetailInclude;
 }>;
 
-/** A closed interview is intentionally not rejected here: only the invite and
- * attempt flows decide what an already submitted assessment may still do. */
+/** Invite and attempt flows reject a cancelled or completed interview. */
 const ASSESSMENT_WINDOW_MESSAGES: InterviewWindowMessages = {
+  closed:
+    'This assessment was cancelled or has already ended. The invite link is no longer valid.',
   opensAt: (opensAt) => `This assessment opens at ${opensAt.toLocaleString()}.`,
   closedAt: (closedAt) =>
     `This assessment closed at ${closedAt.toLocaleString()}.`,
@@ -184,10 +185,11 @@ export class TechnicalInterviewContextService {
   assertNotSubmitted(session: { attempt_status: TechnicalAttemptStatus }) {
     if (
       session.attempt_status === TechnicalAttemptStatus.SUBMITTED ||
-      session.attempt_status === TechnicalAttemptStatus.REVIEWED
+      session.attempt_status === TechnicalAttemptStatus.REVIEWED ||
+      session.attempt_status === TechnicalAttemptStatus.EXPIRED
     ) {
       throw new BadRequestException(
-        'This assessment has already been submitted.',
+        'This assessment is closed. The invite link is no longer valid.',
       );
     }
   }
@@ -270,6 +272,12 @@ export class TechnicalInterviewContextService {
         email: string;
       };
       streamUrl: string;
+    }> = [],
+    integrityEvents: Array<{
+      id: string;
+      eventType: string;
+      message: string | null;
+      createdAt: Date;
     }> = [],
   ) {
     const remainingSeconds = session.started_at
@@ -369,6 +377,7 @@ export class TechnicalInterviewContextService {
             : null,
       })),
       recordings: includeAnswerKey ? recordings : [],
+      integrityEvents: includeAnswerKey ? integrityEvents : [],
     };
   }
 }

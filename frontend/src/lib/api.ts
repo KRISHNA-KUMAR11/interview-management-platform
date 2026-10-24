@@ -99,14 +99,24 @@ async function request<T>(
     }
   }
 
-  if (response.status === 401 && guestSession.getToken()) {
-    guestSession.clear();
-  }
-  if (response.status === 401 && techGuestSession.getToken()) {
-    techGuestSession.clear();
+  let payload: ApiResponse<T>;
+  try {
+    payload = (await response.json()) as ApiResponse<T>;
+  } catch {
+    throw new Error('Request failed.');
   }
 
-  const payload = (await response.json()) as ApiResponse<T>;
+  if (response.status === 401) {
+    const message = payload.message ?? '';
+    const sessionClosed =
+      /completed|expired|invalid|closed|not open|no longer valid/i.test(
+        message,
+      );
+    if (sessionClosed) {
+      if (guestSession.getToken()) guestSession.clear();
+      if (techGuestSession.getToken()) techGuestSession.clear();
+    }
+  }
   if (!response.ok || !payload.success) {
     throw new Error(payload.message || 'Request failed.');
   }
@@ -533,6 +543,12 @@ export const technicalInterviewApi = {
         body: JSON.stringify({ answers }),
       },
     );
+  },
+  logIntegrity(id: string, eventType: string, message?: string) {
+    return request(`/technical-interviews/${id}/integrity`, {
+      method: 'POST',
+      body: JSON.stringify({ eventType, message }),
+    });
   },
   submit(id: string, answers: SaveAnswerInput[]) {
     return request<TechnicalInterviewSession>(

@@ -33,6 +33,7 @@ import { LiveInterviewSessionService } from './live-interview-session.service';
     LiveInterviewGateway,
   ],
   exports: [
+    LiveInterviewGateway,
     LiveInterviewContextService,
     LiveInterviewSessionService,
     LiveInterviewAccessService,

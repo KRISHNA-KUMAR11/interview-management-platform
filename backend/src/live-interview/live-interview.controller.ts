@@ -274,7 +274,7 @@ export class LiveInterviewController {
 
   @Post(':id/feedback')
   @HttpCode(HttpStatus.OK)
-  @RequirePermissions('Interview.Feedback')
+  @RequirePermissions('LiveInterview.Join')
   async feedback(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SubmitFeedbackDto,

@@ -97,7 +97,9 @@ export class LiveInterviewContextService {
         session.interview.status === InterviewStatus.CANCELLED
       ) {
         throw new ForbiddenException(
-          'This interview is completed. The invite link is no longer valid.',
+          session.interview.status === InterviewStatus.CANCELLED
+            ? 'This interview was cancelled. The invite link is no longer valid.'
+            : 'This interview is completed. The invite link is no longer valid.',
         );
       }
       return session;

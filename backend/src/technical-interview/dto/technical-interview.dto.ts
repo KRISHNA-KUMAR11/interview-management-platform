@@ -5,6 +5,7 @@ import {
   IsEmail,
   IsInt,
   IsNotEmpty,
+  MaxLength,
   IsOptional,
   IsString,
   IsUUID,
@@ -135,6 +136,18 @@ export class SubmitAnswersDto {
   @ValidateNested({ each: true })
   @Type(() => SaveAnswerDto)
   answers: SaveAnswerDto[];
+}
+
+export class LogIntegrityEventDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(40)
+  eventType: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  message?: string;
 }
 
 export class GradeAnswerDto {

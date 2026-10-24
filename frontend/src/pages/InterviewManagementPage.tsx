@@ -624,9 +624,9 @@ export function InterviewManagementPage() {
                   value={type}
                   onChange={(e) => setType(e.target.value as InterviewType)}
                 >
-                  <option value="LIVE">Live interview</option>
-                  <option value="TECHNICAL">Technical assessment</option>
-                  <option value="COMBINED">Both</option>
+                  <option value="LIVE">Live oral interview</option>
+                  <option value="TECHNICAL">Technical assessment (candidate only)</option>
+                  <option value="COMBINED">Oral interview and technical assessment</option>
                 </select>
               </label>
             )}
@@ -752,7 +752,7 @@ export function InterviewManagementPage() {
                   checked={recordingEnabled}
                   onChange={(e) => setRecordingEnabled(e.target.checked)}
                 />
-                Allow recording in the live room
+                Record the oral video call. The interviewer saves the conversation. The candidate is not recorded separately.
               </label>
             ) : null}
 

@@ -20,22 +20,41 @@ function VideoTile({
   stream,
   label,
   muted = false,
+  mirror = false,
 }: {
   stream: MediaStream | null;
   label: string;
   muted?: boolean;
+  mirror?: boolean;
 }) {
-  const ref = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    if (ref.current) {
-      ref.current.srcObject = stream;
-    }
-  }, [stream]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const attach = useCallback(
+    (node: HTMLVideoElement | null) => {
+      if (!node) return;
+      node.srcObject = stream;
+      void node.play().catch(() => {
+        node.muted = true;
+        void node.play().catch(() => undefined);
+      });
+      const audio = audioRef.current;
+      if (!muted && audio && stream) {
+        audio.srcObject = stream;
+        void audio.play().catch(() => undefined);
+      }
+    },
+    [muted, stream],
+  );
 
   return (
     <div className="video-tile">
-      <video ref={ref} autoPlay playsInline muted={muted} />
+      {muted ? null : <audio ref={audioRef} autoPlay />}
+      <video
+        ref={attach}
+        autoPlay
+        playsInline
+        muted={muted}
+        style={mirror ? { transform: 'scaleX(-1)' } : undefined}
+      />
       <span>{label}</span>
     </div>
   );
@@ -61,15 +80,32 @@ export function LiveInterviewRoomPage() {
   const [weaknesses, setWeaknesses] = useState('');
   const [comments, setComments] = useState('');
 
-  const canFeedback = !isGuest && hasPermission('Interview.Feedback');
-  const canRecord = !isGuest && hasPermission('LiveInterview.Record');
+  const canFeedback =
+    !isGuest &&
+    (user?.userId === session?.interview.interviewer.id ||
+      hasPermission('Interview.Feedback') ||
+      hasPermission('Interview.Conduct') ||
+      hasPermission('Interview.Create') ||
+      user?.role === 'HR' ||
+      user?.role === 'Company Admin');
   const canControl =
     !isGuest &&
     (user?.userId === session?.interview.interviewer.id ||
-      hasPermission('Interview.Create'));
+      hasPermission('Interview.Create') ||
+      hasPermission('Interview.Conduct') ||
+      user?.role === 'HR' ||
+      user?.role === 'Company Admin');
+  const recordsConversation = Boolean(
+    session?.recordingEnabled &&
+      session.interview.status === 'IN_PROGRESS' &&
+      localStream &&
+      canControl,
+  );
+  const skipLeaveRef = useRef(false);
 
   const endGuestAccess = useCallback(
     (inviteToken?: string | null) => {
+      skipLeaveRef.current = true;
       const token = inviteToken ?? session?.inviteToken ?? '';
       localStream?.getTracks().forEach((track) => track.stop());
       guestSession.clear();
@@ -78,13 +114,43 @@ export function LiveInterviewRoomPage() {
     [localStream, navigate, session?.inviteToken],
   );
 
+  const uploadCandidateCamera = useCallback(async () => {
+    const { blob, durationSeconds } = await stopCandidateCameraRef.current();
+    if (!blob || blob.size < 1000) return;
+    await liveInterviewApi.uploadRecording(id, blob, {
+      label: `Candidate · ${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim(),
+      durationSeconds,
+    });
+  }, [id, user?.firstName, user?.lastName]);
+
   const onRemoteSessionEvent = useCallback(
     (type: string) => {
-      if (type === 'completed' && isGuest) {
+      if (type === 'save-recording' && isGuest) {
+        void uploadCandidateCamera().catch(() => undefined);
+        return;
+      }
+      if ((type === 'completed' || type === 'cancelled') && isGuest) {
         endGuestAccess();
+        return;
+      }
+      if (type === 'started') {
+        setSession((current) =>
+          current
+            ? {
+                ...current,
+                interview: { ...current.interview, status: 'IN_PROGRESS' },
+              }
+            : current,
+        );
+      }
+      if (type === 'started' || type === 'completed') {
+        void liveInterviewApi
+          .get(id)
+          .then((response) => setSession(response.data ?? null))
+          .catch(() => undefined);
       }
     },
-    [endGuestAccess, isGuest],
+    [endGuestAccess, id, isGuest, uploadCandidateCamera],
   );
 
   const { remoteStreams, connectionLabel, emitSessionEvent } = useLiveRoom({
@@ -95,14 +161,26 @@ export function LiveInterviewRoomPage() {
     onSessionEvent: onRemoteSessionEvent,
   });
 
-  const recordingActive =
-    session?.interview.status === 'IN_PROGRESS' && Boolean(localStream);
-
+  const recordsCandidateCamera = Boolean(
+    isGuest &&
+      session?.recordingEnabled &&
+      session.interview.status === 'IN_PROGRESS' &&
+      localStream,
+  );
   const { stop: stopRecorder } = useSessionRecorder({
-    active: recordingActive,
+    active: recordsConversation,
     localStream,
     remoteStreams,
+    capture: 'gallery',
   });
+  const { stop: stopCandidateCamera } = useSessionRecorder({
+    active: recordsCandidateCamera,
+    localStream,
+    remoteStreams: [],
+    capture: 'camera',
+  });
+  const stopCandidateCameraRef = useRef(stopCandidateCamera);
+  stopCandidateCameraRef.current = stopCandidateCamera;
 
   const refresh = async () => {
     const response = await liveInterviewApi.get(id);
@@ -113,7 +191,7 @@ export function LiveInterviewRoomPage() {
     const { blob, durationSeconds } = await stopRecorder();
     if (!blob || blob.size < 1000) return;
     await liveInterviewApi.uploadRecording(id, blob, {
-      label: `${user?.firstName ?? 'Participant'} session recording`,
+      label: `Conversation · ${user?.firstName ?? 'Interviewer'} ${user?.lastName ?? ''}`.trim(),
       durationSeconds,
     });
   };
@@ -138,7 +216,15 @@ export function LiveInterviewRoomPage() {
         }
         setLocalStream(stream);
         await liveInterviewApi.mediaCheck(id, true, true);
-        await liveInterviewApi.logEvent(id, 'joined_room', 'Entered interview room');
+        try {
+          await liveInterviewApi.logEvent(
+            id,
+            'joined_room',
+            'Entered the oral interview',
+          );
+        } catch {
+          // Joining the call matters more than the activity log.
+        }
       } catch (err) {
         if (active) {
           setError(err instanceof Error ? err.message : 'Unable to open room.');
@@ -150,7 +236,9 @@ export function LiveInterviewRoomPage() {
 
     return () => {
       active = false;
-      void liveInterviewApi.leave(id);
+      if (!skipLeaveRef.current) {
+        void liveInterviewApi.leave(id).catch(() => undefined);
+      }
     };
   }, [id]);
 
@@ -159,6 +247,19 @@ export function LiveInterviewRoomPage() {
       localStream?.getTracks().forEach((track) => track.stop());
     };
   }, [localStream]);
+
+  useEffect(() => {
+    if (!isGuest) return;
+    const timer = window.setInterval(() => {
+      void liveInterviewApi.get(id).catch((err) => {
+        const message = err instanceof Error ? err.message : '';
+        if (/closed|cancel|completed|expired|no longer/i.test(message)) {
+          endGuestAccess();
+        }
+      });
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [endGuestAccess, id, isGuest]);
 
   const onStart = async () => {
     setBusy(true);
@@ -175,40 +276,21 @@ export function LiveInterviewRoomPage() {
     }
   };
 
-  const onToggleRecording = async () => {
-    if (!session) return;
-    setBusy(true);
-    setError('');
-    try {
-      const next = !session.isRecording;
-      const response = await liveInterviewApi.toggleRecording(id, next);
-      setSession(response.data ?? null);
-      emitSessionEvent(next ? 'recording-started' : 'recording-stopped');
-      await liveInterviewApi.logEvent(
-        id,
-        next ? 'recording_started' : 'recording_stopped',
-        next ? 'Recording marked on' : 'Recording marked off',
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Recording toggle failed.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const onComplete = async () => {
     setBusy(true);
     setError('');
     try {
-      try {
-        await saveRecordingToDb();
-      } catch (uploadErr) {
-        console.error(uploadErr);
-        setError(
-          uploadErr instanceof Error
-            ? `Interview completed but recording upload failed: ${uploadErr.message}`
-            : 'Recording upload failed.',
-        );
+      emitSessionEvent('save-recording');
+      await new Promise((resolve) => window.setTimeout(resolve, 3000));
+      if (recordsConversation) {
+        try {
+          await saveRecordingToDb();
+        } catch (uploadErr) {
+          console.error(uploadErr);
+          setError(
+            'The interview will still be completed. The conversation recording could not be saved.',
+          );
+        }
       }
 
       const response = await liveInterviewApi.complete(id);
@@ -230,11 +312,17 @@ export function LiveInterviewRoomPage() {
   const onLeave = async () => {
     setBusy(true);
     try {
-      if (session?.interview.status === 'IN_PROGRESS' || recordingActive) {
+      if (isGuest) {
+        try {
+          await uploadCandidateCamera();
+        } catch {
+          // Leaving the call still succeeds when the upload fails.
+        }
+      } else if (recordsConversation) {
         try {
           await saveRecordingToDb();
         } catch {
-          // still allow leave
+          // Leaving the call still succeeds when the upload fails.
         }
       }
       await liveInterviewApi.leave(id);
@@ -301,10 +389,9 @@ export function LiveInterviewRoomPage() {
         <div>
           <strong>{session.interview.title}</strong>
           <span>
-            {session.roomCode} · {session.interview.status.replace('_', ' ')} ·{' '}
-            {connectionLabel}
-            {recordingActive ? ' · SAVING A/V' : ''}
-            {session.isRecording ? ' · REC' : ''}
+            {session.roomCode} · Oral interview ·{' '}
+            {session.interview.status.replace('_', ' ')} · {connectionLabel}
+            {recordsConversation ? ' · Recording conversation' : ''}
           </span>
         </div>
         <div className="room-actions">
@@ -318,19 +405,6 @@ export function LiveInterviewRoomPage() {
               onClick={() => void onStart()}
             >
               Start interview
-            </button>
-          ) : null}
-          {canControl &&
-          canRecord &&
-          session.recordingEnabled &&
-          session.interview.status === 'IN_PROGRESS' ? (
-            <button
-              type="button"
-              className="ghost-btn"
-              disabled={busy}
-              onClick={() => void onToggleRecording()}
-            >
-              {session.isRecording ? 'Stop recording flag' : 'Start recording flag'}
             </button>
           ) : null}
           {canControl && session.interview.status === 'IN_PROGRESS' ? (
@@ -370,6 +444,7 @@ export function LiveInterviewRoomPage() {
           stream={localStream}
           label={`You (${user?.firstName ?? 'Local'})`}
           muted
+          mirror
         />
         {remoteStreams.map((remote) => (
           <VideoTile
@@ -382,8 +457,8 @@ export function LiveInterviewRoomPage() {
           <div className="video-tile placeholder">
             <span>
               {isGuest
-                ? 'Waiting for the interviewer to join…'
-                : 'Waiting for the other participant…'}
+                ? 'Waiting for HR or the interviewer to join the call…'
+                : 'Waiting for the candidate or another participant…'}
             </span>
           </div>
         ) : null}

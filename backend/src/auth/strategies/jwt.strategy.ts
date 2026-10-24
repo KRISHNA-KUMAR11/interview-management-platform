@@ -51,7 +51,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         live.interview.status === 'CANCELLED'
       ) {
         throw new UnauthorizedException(
-          'This interview is completed. The invite link is no longer valid.',
+          live.interview.status === 'CANCELLED'
+            ? 'This interview was cancelled. The invite link is no longer valid.'
+            : 'This interview is completed. The invite link is no longer valid.',
         );
       }
 
@@ -102,6 +104,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       }
 
       if (
+        tech.interview.status === 'COMPLETED' ||
+        tech.interview.status === 'CANCELLED' ||
         tech.attempt_status === 'SUBMITTED' ||
         tech.attempt_status === 'REVIEWED' ||
         tech.attempt_status === 'EXPIRED'

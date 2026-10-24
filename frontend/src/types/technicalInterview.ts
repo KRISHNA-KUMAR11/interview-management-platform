@@ -78,6 +78,14 @@ export interface TechnicalInterviewSession {
   questions: TechnicalQuestionLink[];
   answers: TechnicalAnswer[];
   recordings?: TechnicalRecording[];
+  integrityEvents?: TechnicalIntegrityEvent[];
+}
+
+export interface TechnicalIntegrityEvent {
+  id: string;
+  eventType: string;
+  message?: string | null;
+  createdAt: string;
 }
 
 export interface TechnicalRecording {

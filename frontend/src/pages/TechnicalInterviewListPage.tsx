@@ -356,8 +356,9 @@ export function TechnicalInterviewListPage() {
           <p className="eyebrow">Technical Interview</p>
           <h1>Timed assessments</h1>
           <p className="lede">
-            Assign question-bank items, set an open window and time limit, then
-            share a candidate invite link.
+            The candidate joins alone, answers questions on screen, and is the
+            only person on camera. Tab switches, copy, and paste are recorded
+            for review. Share the invite link for the open window.
           </p>
         </div>
         {canCreate ? (

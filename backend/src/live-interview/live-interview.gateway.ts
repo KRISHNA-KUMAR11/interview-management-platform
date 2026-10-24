@@ -223,6 +223,10 @@ export class LiveInterviewGateway implements OnGatewayConnection {
     return { ok: true };
   }
 
+  notifyRoom(roomCode: string, type: 'cancelled' | 'completed') {
+    this.server.to(`live:${roomCode}`).emit('session:event', { type });
+  }
+
   @SubscribeMessage('session:event')
   broadcastSessionEvent(
     @ConnectedSocket() client: Socket,

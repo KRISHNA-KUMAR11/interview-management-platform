@@ -55,14 +55,21 @@ export function useLiveRoom(options: {
       });
 
       pc.ontrack = (event) => {
-        const stream = event.streams[0];
-        if (!stream) return;
         const label =
           peer.firstName && peer.lastName
             ? `${peer.firstName} ${peer.lastName}`
             : 'Participant';
         setRemoteStreams((prev) => {
-          if (prev.some((item) => item.socketId === peer.socketId)) {
+          const existing = prev.find((item) => item.socketId === peer.socketId);
+          const stream =
+            existing?.stream ??
+            (event.streams[0]?.getTracks().length
+              ? event.streams[0]
+              : new MediaStream());
+          if (!stream.getTracks().some((track) => track.id === event.track.id)) {
+            stream.addTrack(event.track);
+          }
+          if (existing) {
             return prev.map((item) =>
               item.socketId === peer.socketId ? { ...item, stream, label } : item,
             );

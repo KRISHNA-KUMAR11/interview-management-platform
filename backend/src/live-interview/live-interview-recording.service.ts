@@ -46,7 +46,14 @@ export class LiveInterviewRecordingService {
     file: Express.Multer.File,
     meta: { label?: string; durationSeconds?: number },
   ) {
-    await this.context.findAccessibleSession(id, user);
+    const session = await this.context.findAccessibleSession(id, user);
+    if (
+      user.isGuest &&
+      user.liveInterviewId &&
+      user.liveInterviewId !== session.id
+    ) {
+      throw new ForbiddenException('Access denied for this interview.');
+    }
 
     if (!file) {
       throw new BadRequestException('Recording file is required.');

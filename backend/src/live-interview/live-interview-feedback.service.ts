@@ -13,12 +13,18 @@ export class LiveInterviewFeedbackService {
 
   async submitFeedback(id: string, user: AuthUser, dto: SubmitFeedbackDto) {
     const session = await this.context.findAccessibleSession(id, user);
-    const isInterviewer =
+    const canSubmit =
+      user.role === 'SUPER_ADMIN' ||
+      user.role === 'COMPANY_ADMIN' ||
+      user.role === 'HR' ||
       session.interview.interviewer_id === user.userId ||
-      user.permissions.includes('Interview.Feedback');
+      user.permissions.includes('Interview.Feedback') ||
+      user.permissions.includes('Interview.Conduct');
 
-    if (!isInterviewer && user.role !== 'SUPER_ADMIN') {
-      throw new ForbiddenException('Only interviewers can submit feedback.');
+    if (!canSubmit) {
+      throw new ForbiddenException(
+        'Only the interviewer or HR can submit feedback.',
+      );
     }
 
     const feedback = await this.prisma.interviewFeedback.upsert({

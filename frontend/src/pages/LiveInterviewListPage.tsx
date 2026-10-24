@@ -320,9 +320,9 @@ export function LiveInterviewListPage() {
           <p className="eyebrow">Live Interview</p>
           <h1>Video interview rooms</h1>
           <p className="lede">
-            Set an open and close time for each session. Candidates can only join
-            within that window; after it ends the interview and link close
-            automatically.
+            Oral one-on-one video interview with HR or another interviewer.
+            Extra participants can join the same call. The interviewer records
+            the conversation. The candidate is not recorded on their own.
           </p>
         </div>
         {canCreate ? (
@@ -558,7 +558,7 @@ export function LiveInterviewListPage() {
                 checked={recordingEnabled}
                 onChange={(e) => setRecordingEnabled(e.target.checked)}
               />
-              Enable recording option
+              Record the oral conversation from the interviewer&apos;s side
             </label>
             <label className="full">
               Notes

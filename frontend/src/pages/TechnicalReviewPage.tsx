@@ -132,7 +132,19 @@ export function TechnicalReviewPage() {
         score,
         feedback: gradeFeedback[questionId] || undefined,
       });
-      setSession(response.data ?? null);
+      setSession((current) => {
+        const next = response.data ?? null;
+        if (!next) return null;
+        return {
+          ...next,
+          recordings: next.recordings?.length
+            ? next.recordings
+            : current?.recordings,
+          integrityEvents: next.integrityEvents?.length
+            ? next.integrityEvents
+            : current?.integrityEvents,
+        };
+      });
       setInfo('Score saved.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Grading failed.');
@@ -192,13 +204,17 @@ export function TechnicalReviewPage() {
       {info ? <div className="alert success">{info}</div> : null}
 
       <section className="review-recordings">
-        <h2 className="section-title">Candidate face recording</h2>
+        <h2 className="section-title">Candidate camera</h2>
+        <p className="lede">
+          Only the candidate is in this recording. They answered the questions
+          alone.
+        </p>
         {!session.recordings || session.recordings.length === 0 ? (
           <div className="empty-state">
-            <strong>No face recording</strong>
+            <strong>No candidate recording</strong>
             <p>
-              The candidate may have submitted before the upload finished, or
-              camera access was unavailable.
+              The camera file was not uploaded. Answers are still available
+              below.
             </p>
           </div>
         ) : (
@@ -211,6 +227,22 @@ export function TechnicalReviewPage() {
             />
           ))
         )}
+        {session.integrityEvents && session.integrityEvents.length > 0 ? (
+          <div className="review-answer-block">
+            <strong>Anti-cheat notes</strong>
+            <ul className="detail-list">
+              {session.integrityEvents.map((event) => (
+                <li key={event.id}>
+                  <strong>{event.eventType.replace(/_/g, ' ')}</strong>
+                  <span>
+                    {event.message || 'Recorded'} ·{' '}
+                    {new Date(event.createdAt).toLocaleString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </section>
 
       <div className="tech-question-list">

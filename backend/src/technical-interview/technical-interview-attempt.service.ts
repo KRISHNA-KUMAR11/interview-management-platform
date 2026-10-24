@@ -1,4 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import {
   InterviewStatus,
   QuestionType,
@@ -68,7 +71,8 @@ export class TechnicalInterviewAttemptService {
     const session = await this.context.findAccessible(id, user);
     this.context.assertCandidateAccess(session, user);
     this.context.assertInProgress(session);
-    this.context.assertNotTimedOut(session);
+    // The browser auto-submits as the countdown hits zero, which is already
+    // past the server deadline. Accept that final submit instead of erroring.
 
     await this.upsertAnswers(session.id, dto.answers);
     const autoScore = await this.autoGradeMcq(session.id);
@@ -172,4 +176,91 @@ export class TechnicalInterviewAttemptService {
     total = existing.reduce((sum, a) => sum + (a.score ?? 0), 0);
     return { total };
   }
+
+  async logIntegrity(
+    id: string,
+    user: AuthUser,
+    eventType: string,
+    message?: string,
+  ) {
+    const allowed = new Set([
+      'tab_hidden',
+      'tab_visible',
+      'window_blur',
+      'copy_blocked',
+      'paste_blocked',
+      'cut_blocked',
+      'print_blocked',
+      'context_menu_blocked',
+      'fullscreen_exited',
+      'camera_interrupted',
+    ]);
+    if (!allowed.has(eventType)) {
+      return { recorded: false };
+    }
+
+    const session = await this.context.findAccessible(id, user);
+    this.context.assertCandidateAccess(session, user);
+    if (
+      session.attempt_status !== TechnicalAttemptStatus.IN_PROGRESS &&
+      session.attempt_status !== TechnicalAttemptStatus.NOT_STARTED
+    ) {
+      return { recorded: false };
+    }
+
+    const event = appendIntegrityEvent(id, eventType, message);
+    return {
+      recorded: true,
+      id: event.id,
+      eventType: event.eventType,
+      createdAt: event.createdAt,
+    };
+  }
+}
+
+export interface StoredIntegrityEvent {
+  id: string;
+  eventType: string;
+  message: string | null;
+  createdAt: string;
+}
+
+function integrityFile(id: string) {
+  return join(
+    process.cwd(),
+    'uploads',
+    'technical-interviews',
+    id,
+    'integrity-events.json',
+  );
+}
+
+export function listIntegrityEvents(id: string): StoredIntegrityEvent[] {
+  const path = integrityFile(id);
+  if (!existsSync(path)) return [];
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as StoredIntegrityEvent[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function appendIntegrityEvent(
+  id: string,
+  eventType: string,
+  message?: string,
+): StoredIntegrityEvent {
+  const path = integrityFile(id);
+  mkdirSync(join(path, '..'), { recursive: true });
+  const events = listIntegrityEvents(id);
+  const event: StoredIntegrityEvent = {
+    id: randomUUID(),
+    eventType,
+    message: message?.slice(0, 240) ?? null,
+    createdAt: new Date().toISOString(),
+  };
+  events.push(event);
+  writeFileSync(path, JSON.stringify(events));
+  return event;
 }

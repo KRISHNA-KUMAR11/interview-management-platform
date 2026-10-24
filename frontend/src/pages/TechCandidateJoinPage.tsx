@@ -78,7 +78,9 @@ export function TechCandidateJoinPage() {
     const expired =
       error.toLowerCase().includes('expired') ||
       error.toLowerCase().includes('closed') ||
-      error.toLowerCase().includes('submitted');
+      error.toLowerCase().includes('submitted') ||
+      error.toLowerCase().includes('cancelled') ||
+      error.toLowerCase().includes('canceled');
     return (
       <div className="auth-page single">
         <div className="auth-form card">

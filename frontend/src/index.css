@@ -2234,6 +2234,7 @@ textarea {
   object-fit: cover;
   transform: scaleX(-1);
   display: block;
+  background: #0c1713;
 }
 
 .face-pip-badge {

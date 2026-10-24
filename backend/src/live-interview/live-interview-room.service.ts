@@ -129,7 +129,7 @@ export class LiveInterviewRoomService {
         where: { id: live.id },
         data: {
           started_at: live.started_at ?? new Date(),
-          is_recording: true,
+          is_recording: live.recording_enabled,
         },
         include: liveInterviewDetailInclude,
       });

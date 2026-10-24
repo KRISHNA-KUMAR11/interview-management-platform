@@ -20,6 +20,7 @@ import {
 import { assertPermission, interviewScopeWhere, interviewerRoleWhere } from '../common/interview-scope';
 import { resolveInterviewWindow } from '../common/interview-window';
 import { generateInviteToken, generateRoomCode } from '../common/invite-token';
+import { LiveInterviewGateway } from '../live-interview/live-interview.gateway';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateInterviewDto,
@@ -59,7 +60,10 @@ type InterviewDetail = Prisma.InterviewGetPayload<{
 
 @Injectable()
 export class InterviewsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly liveGateway: LiveInterviewGateway,
+  ) {}
 
   async summary(user: AuthUser) {
     assertPermission(user, 'Interview.View');
@@ -367,11 +371,37 @@ export class InterviewsService {
       throw new BadRequestException('Completed interviews cannot be cancelled.');
     }
 
-    const updated = await this.prisma.interview.update({
-      where: { id },
-      data: { status: InterviewStatus.CANCELLED },
-      include: this.detailInclude(),
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const interview = await tx.interview.update({
+        where: { id },
+        data: { status: InterviewStatus.CANCELLED },
+        include: this.detailInclude(),
+      });
+
+      if (existing.liveSession) {
+        await tx.liveInterview.update({
+          where: { id: existing.liveSession.id },
+          data: { ended_at: new Date(), is_recording: false },
+        });
+      }
+
+      if (
+        existing.technicalSession &&
+        existing.technicalSession.attempt_status !== 'SUBMITTED' &&
+        existing.technicalSession.attempt_status !== 'REVIEWED'
+      ) {
+        await tx.technicalInterview.update({
+          where: { id: existing.technicalSession.id },
+          data: { attempt_status: 'EXPIRED' },
+        });
+      }
+
+      return interview;
     });
+
+    if (existing.liveSession?.room_code) {
+      this.liveGateway.notifyRoom(existing.liveSession.room_code, 'cancelled');
+    }
 
     return this.mapInterview(updated);
   }

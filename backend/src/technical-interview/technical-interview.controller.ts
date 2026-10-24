@@ -29,6 +29,7 @@ import { ApiResponseDto } from '../common/dto/api-response.dto';
 import {
   CreateTechnicalInterviewDto,
   GradeAnswerDto,
+  LogIntegrityEventDto,
   SubmitAnswersDto,
   UpdateTechnicalInterviewDto,
 } from './dto/technical-interview.dto';
@@ -149,6 +150,23 @@ export class TechnicalInterviewController {
   ) {
     const data = await this.attemptService.saveAnswers(id, dto, user);
     return ApiResponseDto.ok('Answers saved.', data);
+  }
+
+  @Post(':id/integrity')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('TechnicalInterview.Take')
+  async integrity(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: LogIntegrityEventDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const data = await this.attemptService.logIntegrity(
+      id,
+      user,
+      dto.eventType,
+      dto.message,
+    );
+    return ApiResponseDto.ok('Integrity event recorded.', data);
   }
 
   @Post(':id/submit')

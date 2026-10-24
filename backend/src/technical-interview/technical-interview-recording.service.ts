@@ -27,12 +27,9 @@ export class TechnicalInterviewRecordingService {
       throw new ForbiddenException('Access denied for this assessment.');
     }
 
-    if (
-      session.attempt_status !== 'IN_PROGRESS' &&
-      session.attempt_status !== 'NOT_STARTED'
-    ) {
+    if (session.attempt_status === 'NOT_STARTED') {
       throw new BadRequestException(
-        'Recordings can only be uploaded while the assessment is in progress.',
+        'Start the assessment before uploading the candidate recording.',
       );
     }
 

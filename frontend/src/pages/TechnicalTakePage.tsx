@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { useExamIntegrity } from '../hooks/useExamIntegrity';
 import { useFaceRecorder } from '../hooks/useFaceRecorder';
 import { technicalInterviewApi } from '../lib/api';
 import { techGuestSession } from '../lib/techGuestSession';
@@ -84,18 +85,47 @@ export function TechnicalTakePage() {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [endedByInterviewer, setEndedByInterviewer] = useState(false);
+  const [warning, setWarning] = useState('');
+  const [warningCount, setWarningCount] = useState(0);
   const draftsRef = useRef<DraftMap>({});
   const autoSubmitting = useRef(false);
+  const warningCountRef = useRef(0);
+  const submitRef = useRef<(reason: 'manual' | 'time' | 'warnings') => Promise<void>>(
+    async () => undefined,
+  );
 
   useEffect(() => {
     draftsRef.current = drafts;
   }, [drafts]);
 
-  useEffect(() => {
-    const video = previewRef.current;
-    if (!video || !stream) return;
-    video.srcObject = stream;
-    void video.play().catch(() => undefined);
+  const reportIntegrity = useCallback((type: string, message: string) => {
+    void technicalInterviewApi.logIntegrity(id, type, message).catch(() => undefined);
+    if (type === 'tab_visible') return;
+    const next = warningCountRef.current + 1;
+    warningCountRef.current = next;
+    setWarningCount(next);
+    if (next >= 5) {
+      setWarning('Five warnings reached. Submitting your assessment.');
+      void submitRef.current('warnings');
+      return;
+    }
+    setWarning(`${message} Warning ${next} of 5.`);
+  }, [id]);
+
+  useExamIntegrity({
+    enabled: Boolean(
+      cameraReady && session && !submitted && session.attemptStatus === 'IN_PROGRESS',
+    ),
+    stream,
+    onEvent: reportIntegrity,
+  });
+
+  const attachPreview = useCallback((node: HTMLVideoElement | null) => {
+    previewRef.current = node;
+    if (!node || !stream) return;
+    node.srcObject = stream;
+    void node.play().catch(() => undefined);
   }, [stream]);
 
   const bootstrap = useCallback(async () => {
@@ -144,6 +174,11 @@ export function TechnicalTakePage() {
     try {
       await enableCamera();
       setCameraReady(true);
+      try {
+        await document.documentElement.requestFullscreen();
+      } catch {
+        // Fullscreen is part of the check, not a reason to block the exam.
+      }
       await bootstrap();
     } catch {
       setCameraReady(false);
@@ -185,25 +220,23 @@ export function TechnicalTakePage() {
   );
 
   const submitAssessment = useCallback(
-    async (auto = false) => {
+    async (reason: 'manual' | 'time' | 'warnings' = 'manual') => {
       if (autoSubmitting.current || submitted) return;
       autoSubmitting.current = true;
       setSubmitting(true);
       setError('');
       try {
         const { blob, durationSeconds } = await stopRecording();
+        let recordingNote = '';
         if (blob) {
           try {
             await technicalInterviewApi.uploadFaceRecording(id, blob, {
-              label: 'Candidate face recording',
+              label: 'Candidate only',
               durationSeconds,
             });
-          } catch (uploadErr) {
-            setError(
-              uploadErr instanceof Error
-                ? `Answers will still submit, but face recording upload failed: ${uploadErr.message}`
-                : 'Face recording upload failed. Submitting answers anyway.',
-            );
+          } catch {
+            recordingNote =
+              ' The camera recording could not be uploaded. Your answers were still submitted.';
           }
         }
 
@@ -215,13 +248,25 @@ export function TechnicalTakePage() {
         setSubmitted(true);
         setRemaining(0);
         stopTracks();
-        setInfo(
-          auto
-            ? 'Time is up. Your answers were submitted automatically.'
-            : 'Assessment submitted. Thank you.',
-        );
+        if (document.fullscreenElement) {
+          void document.exitFullscreen().catch(() => undefined);
+        }
+        const lead =
+          reason === 'warnings'
+            ? 'Five warnings were recorded. Your assessment was submitted automatically.'
+            : reason === 'time'
+              ? 'Time is up. Your answers were submitted automatically.'
+              : 'Assessment submitted. Thank you.';
+        setInfo(lead + recordingNote);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Submit failed.');
+        const message = err instanceof Error ? err.message : 'Submit failed.';
+        if (/already been submitted|already submitted|already closed/i.test(message)) {
+          setSubmitted(true);
+          setInfo('This assessment is already submitted. You can close this window.');
+          stopTracks();
+          return;
+        }
+        setError(message);
         autoSubmitting.current = false;
       } finally {
         setSubmitting(false);
@@ -229,6 +274,31 @@ export function TechnicalTakePage() {
     },
     [id, stopRecording, stopTracks, submitted],
   );
+  submitRef.current = submitAssessment;
+
+  useEffect(() => {
+    if (!session || submitted) return;
+    const timer = window.setInterval(() => {
+      void technicalInterviewApi.get(id).catch((err) => {
+        const message = err instanceof Error ? err.message : '';
+        if (
+          autoSubmitting.current ||
+          !/closed|cancel|completed|expired|no longer/i.test(message)
+        ) {
+          return;
+        }
+        techGuestSession.clear();
+        stopTracks();
+        setEndedByInterviewer(true);
+        setSubmitted(true);
+        setRemaining(0);
+        setInfo(
+          'The interviewer ended this assessment. The invite link is closed.',
+        );
+      });
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [id, session, stopTracks, submitted]);
 
   useEffect(() => {
     if (!session || submitted || session.attemptStatus !== 'IN_PROGRESS') {
@@ -238,7 +308,7 @@ export function TechnicalTakePage() {
       setRemaining((prev) => {
         if (prev <= 1) {
           window.clearInterval(timer);
-          void submitAssessment(true);
+          void submitAssessment('time');
           return 0;
         }
         return prev - 1;
@@ -291,8 +361,9 @@ export function TechnicalTakePage() {
           <p className="eyebrow">Camera required</p>
           <h2>Enable your camera to continue</h2>
           <p className="lede">
-            This assessment records your face for the full duration. Allow
-            camera and microphone access, then start.
+            This is a solo assessment. Only you are recorded while you answer
+            the questions. Allow your camera, stay in this window, and do not
+            switch tabs.
           </p>
           {(cameraError || error) && (
             <div className="alert" role="alert">
@@ -340,13 +411,13 @@ export function TechnicalTakePage() {
           <div className="done-mark" aria-hidden="true">
             ✓
           </div>
-          <p className="eyebrow">Submitted</p>
+          <p className="eyebrow">{endedByInterviewer ? 'Ended' : 'Submitted'}</p>
           <h1>{session.interview.title}</h1>
           <p className="lede">
             {info ||
               'Your answers have been submitted. You can close this window.'}
           </p>
-          {session.totalScore != null ? (
+          {endedByInterviewer ? null : session.totalScore != null ? (
             <p className="meta">
               Auto-scored so far: {session.totalScore}/{session.maxScore}
             </p>
@@ -415,6 +486,7 @@ export function TechnicalTakePage() {
       </div>
 
       {error ? <div className="alert">{error}</div> : null}
+      {warning ? <div className="alert">{warning} This was recorded.</div> : null}
       {info ? <div className="alert success">{info}</div> : null}
 
       <div className="tech-question-list">
@@ -512,7 +584,7 @@ export function TechnicalTakePage() {
       </div>
 
       <div className="face-pip" aria-label="Your camera preview">
-        <video ref={previewRef} muted playsInline autoPlay />
+        <video ref={attachPreview} muted playsInline autoPlay />
         <span className={`face-pip-badge ${recording ? 'on' : ''}`}>
           {recording ? 'REC' : 'Camera'}
         </span>
@@ -520,7 +592,8 @@ export function TechnicalTakePage() {
 
       <footer className="tech-exam-footer">
         <p className="meta">
-          Your face is being recorded. Answers save automatically.
+          Only your camera is recording. Warnings {warningCount} of 5. A fifth
+          warning submits the assessment. Answers save automatically.
         </p>
         <div className="form-actions">
           <button
@@ -544,7 +617,7 @@ export function TechnicalTakePage() {
                     }. Submit anyway? You will not be able to edit answers after this.`
                   : 'Submit your assessment? You will not be able to edit answers after this.',
               );
-              if (confirmed) void submitAssessment(false);
+              if (confirmed) void submitAssessment('manual');
             }}
           >
             {submitting ? 'Submitting…' : 'Submit assessment'}

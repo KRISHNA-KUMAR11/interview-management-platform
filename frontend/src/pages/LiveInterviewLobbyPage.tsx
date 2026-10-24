@@ -45,6 +45,23 @@ export function LiveInterviewLobbyPage() {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (!isGuest) return;
+    const timer = window.setInterval(() => {
+      void liveInterviewApi.get(id).catch((err) => {
+        const message = err instanceof Error ? err.message : '';
+        if (/closed|cancel|completed|expired|no longer/i.test(message)) {
+          streamRef.current?.getTracks().forEach((track) => track.stop());
+          setError(
+            'This interview was ended. The invite link is no longer valid.',
+          );
+          setSession(null);
+        }
+      });
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [id, isGuest]);
+
   const runMediaCheck = async () => {
     setChecking(true);
     setError('');
@@ -57,6 +74,7 @@ export function LiveInterviewLobbyPage() {
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        void videoRef.current.play().catch(() => undefined);
       }
 
       const videoTrack = stream.getVideoTracks()[0];
@@ -109,10 +127,15 @@ export function LiveInterviewLobbyPage() {
   }
 
   if (!session) {
+    const inviteClosed = /closed|cancel|completed|expired|no longer/i.test(
+      error,
+    );
     return (
       <section className="page live-lobby">
         <div className="alert">{error}</div>
-        {!isGuest ? (
+        {inviteClosed ? (
+          <p className="lede">You can close this window.</p>
+        ) : !isGuest ? (
           <Link to="/live-interview">Back to live interviews</Link>
         ) : null}
       </section>
@@ -147,10 +170,11 @@ export function LiveInterviewLobbyPage() {
           <p className="eyebrow">Lobby · Room {session.roomCode}</p>
           <h1>{session.interview.title}</h1>
           <p className="lede">
-            Candidate {session.interview.candidate.firstName}{' '}
-            {session.interview.candidate.lastName} with{' '}
+            Oral video call. {session.interview.candidate.firstName}{' '}
+            {session.interview.candidate.lastName} meets{' '}
             {session.interview.interviewer.firstName}{' '}
-            {session.interview.interviewer.lastName}
+            {session.interview.interviewer.lastName}. Other participants can
+            join the same room.
           </p>
         </div>
         <Link
@@ -222,7 +246,11 @@ export function LiveInterviewLobbyPage() {
             </li>
             <li>
               <strong>Recording</strong>
-              <span>{session.recordingEnabled ? 'Optional' : 'Disabled'}</span>
+              <span>
+                {session.recordingEnabled
+                  ? 'Interviewer records the call'
+                  : 'Not recorded'}
+              </span>
             </li>
             <li>
               <strong>Your role</strong>

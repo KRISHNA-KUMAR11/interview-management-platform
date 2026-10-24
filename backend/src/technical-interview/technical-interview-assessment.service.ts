@@ -22,6 +22,7 @@ import {
   CreateTechnicalInterviewDto,
   UpdateTechnicalInterviewDto,
 } from './dto/technical-interview.dto';
+import { listIntegrityEvents } from './technical-interview-attempt.service';
 import { TechnicalInterviewRecordingService } from './technical-interview-recording.service';
 
 @Injectable()
@@ -67,7 +68,18 @@ export class TechnicalInterviewAssessmentService {
     const recordings = includeAnswerKey
       ? await this.recordingService.listForSession(id, user)
       : [];
-    return this.context.mapSession(fresh, includeAnswerKey, recordings);
+    const integrityEvents = includeAnswerKey ? listIntegrityEvents(id) : [];
+    return this.context.mapSession(
+      fresh,
+      includeAnswerKey,
+      recordings,
+      integrityEvents.map((event) => ({
+        id: event.id,
+        eventType: event.eventType,
+        message: event.message,
+        createdAt: new Date(event.createdAt),
+      })),
+    );
   }
 
   async create(dto: CreateTechnicalInterviewDto, user: AuthUser) {
